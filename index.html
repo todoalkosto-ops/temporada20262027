@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Departamento en Mar del Plata · Disponibilidad y tarifas</title>
+<script>
+/* =====================================================================
+   CONFIGURACIÓN DE TARIFAS
+   Editá este bloque para cambiar precios, fechas o textos.
+   Fechas siempre en formato "AAAA-MM-DD".
+   Una "noche" es la fecha del día en que entrás (entrada 14 h, salida 10 h).
+   ===================================================================== */
+window.CONFIG = {
+  titulo: "Departamento en Mar del Plata",
+  subtitulo: "Temporada 2026/2027",
+  horaEntrada: "14:00",
+  horaSalida: "10:00",
+
+  // Rango del calendario (primer día disponible y último día de salida posible)
+  temporadaDesde: "2026-11-01",
+  temporadaHasta: "2027-03-01",
+
+  // Mínimo de noches por reserva
+  minNoches: 1,
+
+  // Número de WhatsApp para consultas, con código de país y sin "+" ni espacios
+  // (ej. "5491122334455"). Dejalo vacío para no mostrar el botón.
+  whatsapp: "",
+
+  // Precio por noche según mes (1 = enero ... 12 = diciembre)
+  // estadia  = cuadro "Estadías largas y días de semana"
+  // general  = cuadro "Tarifa general"
+  // especial = cuadro "Fines de semana largos y fechas especiales"
+  precios: {
+    11: { estadia: 55000, general: 62500,  especial: 70000 },
+    12: { estadia: 65000, general: 75000,  especial: 85000 },
+    1:  { estadia: 85000, general: 100000, especial: 115000 },
+    2:  { estadia: 75000, general: 85000,  especial: 95000 }
+  },
+
+  // Noches que siempre llevan tarifa "especial" (rangos inclusive)
+  fechasEspeciales: [
+    { desde: "2026-11-19", hasta: "2026-11-21", motivo: "Fin de semana largo de la Soberanía Nacional" },
+    { desde: "2026-12-23", hasta: "2026-12-31", motivo: "Navidad y Año Nuevo" },
+    { desde: "2027-02-01", hasta: "2027-02-08", motivo: "Primera semana de febrero y Carnaval" }
+  ],
+
+  // Enero: viernes y sábados desde este día del mes llevan tarifa "especial"
+  eneroFindesDesdeDia: 16,
+
+  // Feriados (la noche del feriado y la noche anterior no cuentan como "día de semana")
+  feriados: ["2026-11-20", "2026-12-07", "2026-12-08", "2026-12-25", "2027-01-01", "2027-02-08", "2027-02-09"],
+
+  // Noches mínimas para considerar "estadía larga"
+  nochesEstadiaLarga: 8,     // más de 7 noches
+  nochesQuincenaEnero: 15,   // en enero, solo quincena completa
+
+  // Textos de los cuadros que se muestran en la página
+  cuadros: {
+    estadia: {
+      titulo: "Estadías largas y días de semana",
+      sub: "Para estadías de más de 7 noches o días hábiles",
+      notas: { 11: "Lunes a jueves, sin feriados", 12: "Primera quincena", 1: "Reservas por quincena completa", 2: "Segunda quincena" }
+    },
+    general: {
+      titulo: "Tarifa general",
+      sub: "Reservas de 3 a 5 noches",
+      notas: { 11: "Todo el mes", 12: "Antes de las fiestas", 1: "Todo el mes", 2: "Primera quincena" }
+    },
+    especial: {
+      titulo: "Fines de semana largos y fechas especiales",
+      sub: "Feriados, fiestas y fines de semana de temporada",
+      notas: { 11: "Fin de semana largo de la Soberanía Nacional", 12: "Del 23 al 31 de diciembre", 1: "Fines de semana de la segunda quincena", 2: "Carnaval y primera semana del mes" }
+    }
+  }
+};
+</script>
+<script src="reservas.js"></script>
+<style>
+  :root{
+    --azul:#1f4e6b; --azul-2:#2f6a8c; --arena:#f4efe6; --arena-2:#faf7f1; --linea:#e8e1d4;
+    --texto:#2a2a2a; --suave:#6f6f6f; --ocupado:#d9d3c7; --ocupado-t:#9a9284; --sel:#1f4e6b; --rango:#d6e5ee; --error:#b3412e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--arena);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.4}
+  header{background:var(--azul);color:#fff;padding:28px 16px}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+  header .wrap{padding:0}
+  .kick{font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:.75}
+  h1{margin:6px 0 4px;font-size:28px}
+  .horarios{opacity:.85;font-size:15px}
+  main{padding:24px 0 48px}
+  .grid{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+  .card{background:#fff;border-radius:16px;box-shadow:0 4px 18px rgba(0,0,0,.06);overflow:hidden}
+  .pad{padding:20px}
+  h2{font-size:18px;margin:0 0 4px}
+  .hint{color:var(--suave);font-size:14px;margin:0 0 14px}
+
+  /* Calendario */
+  .cal-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .cal-nav button{border:1px solid var(--linea);background:#fff;border-radius:10px;width:38px;height:38px;font-size:18px;cursor:pointer;color:var(--azul)}
+  .cal-nav button:disabled{opacity:.3;cursor:default}
+  .meses{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .mes h3{text-align:center;font-size:16px;margin:0 0 10px;text-transform:capitalize}
+  .dias{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .dow{text-align:center;font-size:12px;color:var(--suave);padding:4px 0;text-transform:uppercase}
+  .dia{position:relative;aspect-ratio:1/1;border:0;background:#fff;border-radius:8px;font-size:15px;color:var(--texto);cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit}
+  .dia:hover:not(:disabled){outline:2px solid var(--azul-2)}
+  .dia:disabled{color:#c9c4ba;cursor:default;background:transparent}
+  .dia.oc{background:var(--ocupado);color:var(--ocupado-t);text-decoration:line-through}
+  .dia.oc-in{background:linear-gradient(135deg,#fff 50%,var(--ocupado) 50%)}
+  .dia.oc-out{background:linear-gradient(135deg,var(--ocupado) 50%,#fff 50%)}
+  .dia.rango{background:var(--rango);border-radius:0}
+  .dia.sel{background:var(--sel)!important;color:#fff!important;text-decoration:none}
+  .dia.hoy::after{content:"";position:absolute;bottom:5px;width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.6}
+  .leyenda{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;font-size:13px;color:var(--suave)}
+  .leyenda span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:16px;height:16px;border-radius:4px;border:1px solid var(--linea);display:inline-block}
+  .msg{min-height:20px;margin-top:10px;font-size:14px;color:var(--error)}
+
+  /* Cotización */
+  .cot .fila{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--linea);font-size:15px}
+  .cot .fila:last-child{border-bottom:0}
+  .cot .lbl{color:var(--suave)}
+  .det{font-size:14px;margin:12px 0 0;padding:0;list-style:none}
+  .det li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;color:#444}
+  .det small{display:block;color:var(--suave)}
+  .total{background:var(--arena-2);padding:16px 20px;display:flex;justify-content:space-between;align-items:baseline}
+  .total b{font-size:26px;color:var(--azul)}
+  .vacio{color:var(--suave);font-size:15px}
+  .btn{display:block;width:100%;text-align:center;border:0;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;font-family:inherit}
+  .btn-p{background:var(--azul);color:#fff}
+  .btn-s{background:#fff;color:var(--azul);border:1px solid var(--linea)}
+  .acciones{display:grid;gap:8px;padding:0 20px 20px}
+
+  /* Tarifas */
+  .tarifas{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:20px}
+  .t-head{background:var(--azul);color:#fff;padding:16px 20px}
+  .t-head h3{margin:0;font-size:17px}
+  .t-head p{margin:4px 0 0;font-size:13px;opacity:.85}
+  table{width:100%;border-collapse:collapse}
+  td{padding:10px 20px;border-bottom:1px solid #efe9de;font-size:14px;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.p{font-weight:700;color:var(--azul);white-space:nowrap;text-align:right}
+  td small{display:block;color:var(--suave);font-size:12px}
+  .pie{color:var(--suave);font-size:13px;margin-top:14px}
+
+  /* Admin */
+  .admin{margin-top:20px;border:2px dashed var(--azul-2)}
+  .admin h2{color:var(--azul)}
+  .res-list{list-style:none;padding:0;margin:0 0 14px}
+  .res-list li{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--linea);font-size:14px}
+  .res-list button{border:0;background:none;color:var(--error);cursor:pointer;font-size:14px}
+  textarea{width:100%;height:140px;font-family:ui-monospace,Consolas,monospace;font-size:12px;border:1px solid var(--linea);border-radius:8px;padding:8px}
+  .fila-btn{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .aviso{background:#fff6e0;border-radius:8px;padding:10px 12px;font-size:13px;margin:10px 0}
+
+  @media (max-width:900px){
+    .grid{grid-template-columns:1fr}
+    .tarifas{grid-template-columns:1fr}
+  }
+  @media (max-width:620px){
+    .meses{grid-template-columns:1fr}
+    .mes:nth-child(2){display:none}
+    h1{font-size:23px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="kick" id="subtitulo"></div>
+    <h1 id="titulo"></h1>
+    <div class="horarios" id="horarios"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="grid">
+    <section class="card pad">
+      <h2>Elegí tus fechas</h2>
+      <p class="hint">Tocá el día de entrada y después el de salida.</p>
+      <div class="cal-nav">
+        <button id="prev" aria-label="Mes anterior">&#8249;</button>
+        <button id="next" aria-label="Mes siguiente">&#8250;</button>
+      </div>
+      <div class="meses" id="meses"></div>
+      <div class="msg" id="msg"></div>
+      <div class="leyenda">
+        <span><i class="sw" style="background:#fff"></i>Disponible</span>
+        <span><i class="sw" style="background:var(--ocupado)"></i>Reservado</span>
+        <span><i class="sw" style="background:linear-gradient(135deg,var(--ocupado) 50%,#fff 50%)"></i>Libre desde las <span class="hEnt"></span></span>
+        <span><i class="sw" style="background:var(--sel)"></i>Tu selección</span>
+      </div>
+    </section>
+
+    <aside class="card cot" id="cotizacion"></aside>
+  </div>
+
+  <section class="card pad admin" id="admin" hidden></section>
+
+  <div class="tarifas" id="tarifas"></div>
+  <p class="pie">Valores por noche en pesos argentinos. Entrada desde las <span class="hEnt"></span> y salida hasta las <span class="hSal"></span>.</p>
+</main>
+
+<script>
+(function(){
+  const C = window.CONFIG;
+  if (!window.RESERVAS) {
+    const av = document.createElement("div");
+    av.style.cssText = "background:#fff6e0;color:#7a4b00;padding:12px 16px;text-align:center;font-size:14px";
+    av.textContent = "Aviso: no se encontró el archivo reservas.js junto a esta página, así que no se muestran fechas reservadas.";
+    document.body.prepend(av);
+  }
+  const PUBLICADAS = (window.RESERVAS || []).map(r => ({entrada:r.entrada, salida:r.salida}));
+  const ADMIN = new URLSearchParams(location.search).has("admin");
+  const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
+  const ORDEN_MESES = [11,12,1,2];
+  const KEY_BORRADOR = "depto-mdp-reservas-borrador";
+
+  // ---------- utilidades de fecha (siempre en hora local) ----------
+  const pad = n => String(n).padStart(2,"0");
+  const iso = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+  const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
+  const diffDias = (a,b) => Math.round((parse(b)-parse(a))/86400000);
+  const plata = n => "$" + Math.round(n).toLocaleString("es-AR");
+  const fechaLarga = s => { const d=parse(s); return DIAS[d.getDay()]+" "+d.getDate()+" de "+MESES[d.getMonth()]; };
+
+  const hoy = iso(new Date());
+  const desde = C.temporadaDesde > hoy ? C.temporadaDesde : hoy;
+  const hasta = C.temporadaHasta;
+  const feriados = new Set(C.feriados || []);
+
+  // ---------- reservas ----------
+  let reservas = PUBLICADAS.slice();
+  if (ADMIN) {
+    try { const b = JSON.parse(localStorage.getItem(KEY_BORRADOR)); if (Array.isArray(b)) reservas = b; } catch(e){}
+  }
+  function nochesOcupadas(){
+    const s = new Set();
+    reservas.forEach(r => { for (let d=parse(r.entrada); iso(d)<r.salida; d=addDays(d,1)) s.add(iso(d)); });
+    return s;
+  }
+  let ocupadas = nochesOcupadas();
+
+  // ---------- tarifas ----------
+  function tipoNoche(k, N){
+    const d = parse(k), m = d.getMonth()+1, dia = d.getDate(), dow = d.getDay();
+    if (!C.precios[m]) return null;
+    const esp = (C.fechasEspeciales||[]).find(r => k>=r.desde && k<=r.hasta);
+    if (esp) return {tipo:"especial", motivo:esp.motivo};
+    if (m===1 && dia>=C.eneroFindesDesdeDia && (dow===5 || dow===6)) return {tipo:"especial", motivo:"Fin de semana de la segunda quincena de enero"};
+    const larga = N >= C.nochesEstadiaLarga;
+    const habil = dow>=1 && dow<=4 && !feriados.has(k) && !feriados.has(iso(addDays(d,1)));
+    let estadia = false;
+    if (m===11) estadia = larga || habil;
+    else if (m===12) estadia = dia<=15 && (larga || habil);
+    else if (m===1) estadia = N >= C.nochesQuincenaEnero;
+    else if (m===2) estadia = dia>=16 && (larga || habil);
+    return {tipo: estadia ? "estadia" : "general"};
+  }
+  function cotizar(entrada, salida){
+    const N = diffDias(entrada, salida);
+    const noches = [];
+    for (let d=parse(entrada); iso(d)<salida; d=addDays(d,1)){
+      const k = iso(d), t = tipoNoche(k, N), m = d.getMonth()+1;
+      noches.push({fecha:k, tipo:t ? t.tipo : null, motivo:t && t.motivo, precio: t ? C.precios[m][t.tipo] : null});
+    }
+    // agrupar noches consecutivas con igual tarifa
+    const grupos = [];
+    noches.forEach(n => {
+      const g = grupos[grupos.length-1];
+      if (g && g.tipo===n.tipo && g.precio===n.precio) { g.cant++; g.hasta=n.fecha; }
+      else grupos.push({tipo:n.tipo, precio:n.precio, motivo:n.motivo, cant:1, desde:n.fecha, hasta:n.fecha});
+    });
+    const sinPrecio = noches.some(n => n.precio===null);
+    const total = noches.reduce((a,n) => a + (n.precio||0), 0);
+    return {N, noches, grupos, total, sinPrecio};
+  }
+  window.cotizar = cotizar; // útil para pruebas desde la consola
+
+  // ---------- estado de selección ----------
+  let entrada = null, salida = null, hover = null;
+  let primerMes = (() => { const d = parse(desde); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+  const ultimoMes = (() => { const d = parse(hasta); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+  const mensaje = t => { document.getElementById("msg").textContent = t || ""; };
+
+  function libreEntre(a, b){ // noches a..b-1
+    for (let d=parse(a); iso(d)<b; d=addDays(d,1)) if (ocupadas.has(iso(d))) return false;
+    return true;
+  }
+  function clickDia(k){
+    mensaje("");
+    if (!entrada || salida){
+      if (ocupadas.has(k)) { mensaje("Ese día ya está reservado para entrar."); return; }
+      if (k >= hasta) { mensaje("Ese día solo se puede usar como salida."); return; }
+      entrada = k; salida = null;
+    } else {
+      if (k <= entrada){
+        if (ocupadas.has(k)) { mensaje("Ese día ya está reservado para entrar."); return; }
+        entrada = k; return render();
+      }
+      if (!libreEntre(entrada, k)) { mensaje("Hay noches reservadas en ese rango. Probá con otras fechas."); return; }
+      if (diffDias(entrada, k) < C.minNoches) { mensaje("La estadía mínima es de " + C.minNoches + " noches."); return; }
+      salida = k;
+    }
+    render();
+  }
+
+  // ---------- render calendario ----------
+  function renderMes(base){
+    const y = base.getFullYear(), m = base.getMonth();
+    const primero = new Date(y,m,1), cant = new Date(y,m+1,0).getDate();
+    let h = `<div class="mes"><h3>${MESES[m]} ${y}</h3><div class="dias">`;
+    ["lun","mar","mié","jue","vie","sáb","dom"].forEach(d => h += `<div class="dow">${d}</div>`);
+    const offset = (primero.getDay()+6)%7;
+    for (let i=0;i<offset;i++) h += "<div></div>";
+    const finRango = salida || (entrada && hover && hover>entrada && libreEntre(entrada,hover) ? hover : null);
+    for (let d=1; d<=cant; d++){
+      const k = iso(new Date(y,m,d));
+      const prev = iso(new Date(y,m,d-1));
+      const fuera = k < desde || k > hasta;
+      const ocHoy = ocupadas.has(k), ocAyer = ocupadas.has(prev);
+      let cls = "dia";
+      if (ocHoy && ocAyer) cls += " oc";
+      else if (ocHoy) cls += " oc-in";
+      else if (ocAyer) cls += " oc-out";
+      if (entrada && finRango && k>entrada && k<finRango) cls += " rango";
+      if (k===entrada || k===salida) cls += " sel";
+      if (k===hoy) cls += " hoy";
+      // deshabilitar: fuera de temporada, o noche ocupada que no puede ser salida
+      let dis = fuera;
+      if (!dis && ocHoy && ocAyer) dis = true;
+      if (!dis && ocHoy && !(entrada && !salida && k>entrada)) dis = true;
+      const titulo = ocHoy && !ocAyer ? "Disponible solo como salida (hasta las "+C.horaSalida+")" : (ocAyer && !ocHoy ? "Libre desde las "+C.horaEntrada : "");
+      h += `<button class="${cls}" data-k="${k}" ${dis?"disabled":""} title="${titulo}">${d}</button>`;
+    }
+    return h + "</div></div>";
+  }
+  function renderCal(){
+    const segundo = new Date(primerMes.getFullYear(), primerMes.getMonth()+1, 1);
+    document.getElementById("meses").innerHTML = renderMes(primerMes) + renderMes(segundo);
+    const anchoMovil = window.matchMedia("(max-width:620px)").matches;
+    document.getElementById("prev").disabled = primerMes <= new Date(parse(desde).getFullYear(), parse(desde).getMonth(), 1);
+    document.getElementById("next").disabled = anchoMovil ? primerMes >= ultimoMes : segundo >= ultimoMes;
+  }
+
+  // ---------- render cotización ----------
+  const NOMBRE = t => t ? C.cuadros[t].titulo : "Fuera de temporada";
+  function renderCot(){
+    const el = document.getElementById("cotizacion");
+    if (!entrada){
+      el.innerHTML = `<div class="pad"><h2>Tu estadía</h2><p class="vacio">Elegí la fecha de entrada en el calendario.</p></div>`;
+      return;
+    }
+    if (!salida){
+      el.innerHTML = `<div class="pad"><h2>Tu estadía</h2>
+        <div class="fila"><span class="lbl">Entrada</span><span>${fechaLarga(entrada)}, ${C.horaEntrada} h</span></div>
+        <p class="vacio" style="margin-top:12px">Ahora elegí la fecha de salida.</p></div>`;
+      return;
+    }
+    const q = cotizar(entrada, salida);
+    const det = q.grupos.map(g => {
+      const rango = g.cant===1 ? fechaLarga(g.desde) : fechaLarga(g.desde)+" al "+fechaLarga(g.hasta);
+      const precio = g.precio===null ? "Consultar" : plata(g.precio*g.cant);
+      const sub = g.precio===null ? "" : `${g.cant} ${g.cant===1?"noche":"noches"} × ${plata(g.precio)}`;
+      return `<li><span>${NOMBRE(g.tipo)}<small>${rango}</small><small>${sub}</small></span><b>${precio}</b></li>`;
+    }).join("");
+    const txtWA = encodeURIComponent(`Hola! Quiero consultar por el departamento en Mar del Plata.\nEntrada: ${fechaLarga(entrada)} (${C.horaEntrada} h)\nSalida: ${fechaLarga(salida)} (${C.horaSalida} h)\nNoches: ${q.N}\nTotal: ${q.sinPrecio ? "a consultar" : plata(q.total)}`);
+    el.innerHTML = `<div class="pad"><h2>Tu estadía</h2>
+        <div class="fila"><span class="lbl">Entrada</span><span>${fechaLarga(entrada)}, ${C.horaEntrada} h</span></div>
+        <div class="fila"><span class="lbl">Salida</span><span>${fechaLarga(salida)}, ${C.horaSalida} h</span></div>
+        <div class="fila"><span class="lbl">Noches</span><span>${q.N}</span></div>
+        <ul class="det">${det}</ul></div>
+      <div class="total"><span>Total</span><b>${q.sinPrecio ? "Consultar" : plata(q.total)}</b></div>
+      <div class="acciones" style="padding-top:16px">
+        ${C.whatsapp ? `<a class="btn btn-p" target="_blank" rel="noopener" href="https://wa.me/${C.whatsapp}?text=${txtWA}">Consultar por WhatsApp</a>` : ""}
+        ${ADMIN ? `<button class="btn btn-p" id="marcar">Marcar estas fechas como reservadas</button>` : ""}
+        <button class="btn btn-s" id="limpiar">Elegir otras fechas</button>
+      </div>`;
+    document.getElementById("limpiar").onclick = () => { entrada = salida = null; mensaje(""); render(); };
+    if (ADMIN) document.getElementById("marcar").onclick = () => {
+      reservas.push({entrada, salida});
+      reservas.sort((a,b) => a.entrada.localeCompare(b.entrada));
+      guardarBorrador(); entrada = salida = null; render();
+    };
+  }
+
+  // ---------- render tarifas ----------
+  function renderTarifas(){
+    document.getElementById("tarifas").innerHTML = ["estadia","general","especial"].map(t => {
+      const c = C.cuadros[t];
+      const filas = ORDEN_MESES.filter(m => C.precios[m]).map(m =>
+        `<tr><td><span style="text-transform:capitalize">${MESES[m-1]}</span><small>${c.notas[m]||""}</small></td><td class="p">${plata(C.precios[m][t])}</td></tr>`).join("");
+      return `<div class="card"><div class="t-head"><h3>${c.titulo}</h3><p>${c.sub}</p></div><table>${filas}</table></div>`;
+    }).join("");
+  }
+
+  // ---------- admin ----------
+  function textoArchivo(){
+    const lineas = reservas.map(r => `  { entrada: "${r.entrada}", salida: "${r.salida}" },`).join("\n");
+    return `/* RESERVAS — generado desde la página. Solo fechas, sin datos de huéspedes.
+   Cada reserva ocupa las noches desde "entrada" hasta el día anterior a "salida". */
+window.RESERVAS = [
+${lineas}
+];
+`;
+  }
+  function guardarBorrador(){
+    try { localStorage.setItem(KEY_BORRADOR, JSON.stringify(reservas)); } catch(e){}
+    ocupadas = nochesOcupadas();
+  }
+  function renderAdmin(){
+    if (!ADMIN) return;
+    const el = document.getElementById("admin");
+    el.hidden = false;
+    const cambios = JSON.stringify(reservas) !== JSON.stringify(PUBLICADAS);
+    const lista = reservas.length ? reservas.map((r,i) =>
+      `<li><span>${fechaLarga(r.entrada)} → ${fechaLarga(r.salida)} · ${diffDias(r.entrada,r.salida)} noches</span><button data-i="${i}">Quitar</button></li>`).join("")
+      : `<li><span class="vacio">No hay reservas cargadas.</span></li>`;
+    el.innerHTML = `<h2>Modo administración</h2>
+      <p class="hint">Elegí entrada y salida en el calendario y tocá “Marcar estas fechas como reservadas”. Después descargá el archivo y reemplazá <b>reservas.js</b> en GitHub.</p>
+      ${cambios ? `<div class="aviso">Tenés cambios sin publicar. Los visitantes los van a ver recién cuando subas el nuevo reservas.js a GitHub.</div>` : ""}
+      <ul class="res-list">${lista}</ul>
+      <textarea readonly id="salidaJs">${textoArchivo()}</textarea>
+      <div class="fila-btn">
+        <button class="btn btn-p" id="descargar">Descargar reservas.js</button>
+        <button class="btn btn-s" id="copiar">Copiar texto</button>
+      </div>
+      ${cambios ? `<div class="fila-btn" style="grid-template-columns:1fr"><button class="btn btn-s" id="descartar">Descartar cambios y volver a lo publicado</button></div>` : ""}`;
+    el.querySelectorAll(".res-list button").forEach(b => b.onclick = () => { reservas.splice(+b.dataset.i,1); guardarBorrador(); render(); });
+    document.getElementById("descargar").onclick = () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([textoArchivo()], {type:"text/javascript"}));
+      a.download = "reservas.js"; a.click(); URL.revokeObjectURL(a.href);
+    };
+    document.getElementById("copiar").onclick = async (ev) => {
+      try { await navigator.clipboard.writeText(textoArchivo()); ev.target.textContent = "¡Copiado!"; }
+      catch(e){ const t=document.getElementById("salidaJs"); t.select(); document.execCommand("copy"); ev.target.textContent = "¡Copiado!"; }
+    };
+    const desc = document.getElementById("descartar");
+    if (desc) desc.onclick = () => { reservas = PUBLICADAS.slice(); try{localStorage.removeItem(KEY_BORRADOR);}catch(e){} ocupadas = nochesOcupadas(); render(); };
+  }
+
+  // ---------- eventos e inicio ----------
+  function render(){ renderCal(); renderCot(); renderAdmin(); }
+  const meses = document.getElementById("meses");
+  meses.addEventListener("click", e => { const b = e.target.closest(".dia"); if (b && !b.disabled) clickDia(b.dataset.k); });
+  meses.addEventListener("mouseover", e => {
+    const b = e.target.closest(".dia");
+    if (b && entrada && !salida && b.dataset.k !== hover){ hover = b.dataset.k; renderCal(); }
+  });
+  document.getElementById("prev").onclick = () => { primerMes = new Date(primerMes.getFullYear(), primerMes.getMonth()-1, 1); renderCal(); };
+  document.getElementById("next").onclick = () => { primerMes = new Date(primerMes.getFullYear(), primerMes.getMonth()+1, 1); renderCal(); };
+  window.addEventListener("resize", renderCal);
+
+  document.getElementById("titulo").textContent = C.titulo;
+  document.getElementById("subtitulo").textContent = "Mar del Plata · " + C.subtitulo;
+  document.getElementById("horarios").textContent = `Entrada desde las ${C.horaEntrada} h · Salida hasta las ${C.horaSalida} h`;
+  document.querySelectorAll(".hEnt").forEach(e => e.textContent = C.horaEntrada + " h");
+  document.querySelectorAll(".hSal").forEach(e => e.textContent = C.horaSalida + " h");
+  renderTarifas();
+  render();
+})();
+</script>
+</body>
+</html>
